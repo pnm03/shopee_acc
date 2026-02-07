@@ -25,7 +25,7 @@ export async function POST(
 
         // Remove voucher from existing vouchers
         const currentVouchers = account.vouchers ? account.vouchers.split(', ') : []
-        const updatedVouchers = currentVouchers.filter(v => v !== voucher)
+        const updatedVouchers = currentVouchers.filter((v: string) => v !== voucher)
 
         // Update account with new vouchers
         const updatedAccount = await prisma.shopeeAccount.update({
