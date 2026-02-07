@@ -40,9 +40,16 @@ export async function loginAction(prevState: any, formData: FormData) {
         })
 
         return { success: true }
-    } catch (error) {
-        console.error('Login error:', error)
-        return { error: 'Something went wrong' }
+    } catch (error: any) {
+        console.error('Login Error Details:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            meta: error.meta,
+        })
+        return {
+            error: `Login Failed: ${error.message} (Code: ${error.code || 'N/A'})`
+        }
     }
 }
 
