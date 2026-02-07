@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("staff") // 'admin' | 'staff'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ShopeeAccount {
+  id          String        @id @default(uuid())
+  username    String        @unique
+  password    String?       // Optional for now to avoid breaking existing seed, but UI will require it
+  name        String?       // New field: Tên tài khoản (display name)
+  carrier     String?       // VNMB, Viettel, etc.
+  status      String        @default("new")
+  vouchers    String?       // Stored as comma separated string: "100.000, 20.000"
+  orderCount  Int           @default(0)
+  last_active DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  orders      ShopeeOrder[] // Relation to orders
+}
+
+model ShopeeOrder {
+  id                  String        @id @default(uuid())
+  accountId           String
+  account             ShopeeAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  orderName           String
+  trackingNumber      String?
+  createdDate         DateTime      @default(now())
+  address             String?
+  voucherUsed         String?
+  productLink         String?
+  quantity            Int           @default(1)
+  productCategory     String?
+  finalPrice          Float?
+  status              String        @default("new") // new, picking, shipping, completed, cancelled
+  cancellationReason  String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model NoteCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  notes     Note[]
+}
+
+model Note {
+  id            String        @id @default(uuid())
+  productName   String
+  quantity      Int           @default(1)
+  productCategory String?
+  categoryId    String?
+  category      NoteCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  originalPrice Float?
+  productLink   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
