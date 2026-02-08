@@ -47,35 +47,70 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
 
-        const order = await prisma.shopeeOrder.create({
-            data: {
-                accountId: body.accountId,
-                orderName: body.orderName,
-                trackingNumber: body.trackingNumber,
-                createdDate: body.createdDate ? new Date(body.createdDate) : new Date(),
-                address: body.address,
-                voucherUsed: body.voucherUsed,
-                productLink: body.productLink,
-                quantity: body.quantity || 1,
-                productCategory: body.productCategory,
-                finalPrice: body.finalPrice,
-                status: body.status || 'new',
-                cancellationReason: body.cancellationReason
-            },
-            include: {
-                account: {
-                    select: {
-                        id: true,
-                        name: true,
-                        username: true,
-                        password: true,
-                        carrier: true
+        // Use transaction to ensure both order creation and account update succeed together
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Create the order
+            const order = await tx.shopeeOrder.create({
+                data: {
+                    accountId: body.accountId,
+                    orderName: body.orderName,
+                    trackingNumber: body.trackingNumber,
+                    createdDate: body.createdDate ? new Date(body.createdDate) : new Date(),
+                    address: body.address,
+                    voucherUsed: body.voucherUsed,
+                    productLink: body.productLink,
+                    quantity: body.quantity || 1,
+                    productCategory: body.productCategory,
+                    finalPrice: body.finalPrice,
+                    status: body.status || 'new',
+                    cancellationReason: body.cancellationReason
+                },
+                include: {
+                    account: {
+                        select: {
+                            id: true,
+                            name: true,
+                            username: true,
+                            password: true,
+                            carrier: true,
+                            vouchers: true
+                        }
+                    }
+                }
+            })
+
+            // 2. Increment orderCount for the account
+            await tx.shopeeAccount.update({
+                where: { id: body.accountId },
+                data: { orderCount: { increment: 1 } }
+            })
+
+            // 3. Add voucher to account if voucherUsed is provided
+            if (body.voucherUsed) {
+                const account = await tx.shopeeAccount.findUnique({
+                    where: { id: body.accountId },
+                    select: { vouchers: true }
+                })
+
+                if (account) {
+                    const existingVouchers = account.vouchers ? account.vouchers.split(',').map(v => v.trim()) : []
+                    const newVoucher = body.voucherUsed.trim()
+
+                    // Only add if not already in the list
+                    if (!existingVouchers.includes(newVoucher)) {
+                        const updatedVouchers = [...existingVouchers, newVoucher].filter(v => v).join(', ')
+                        await tx.shopeeAccount.update({
+                            where: { id: body.accountId },
+                            data: { vouchers: updatedVouchers }
+                        })
                     }
                 }
             }
+
+            return order
         })
 
-        return NextResponse.json(order)
+        return NextResponse.json(result)
     } catch (e: any) {
         console.error('API POST /orders Error:', e)
         return NextResponse.json({ error: 'Failed to create order', details: e.message }, { status: 500 })

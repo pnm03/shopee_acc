@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { createAccount, updateAccount, deleteAccount } from './actions'
 import { useRouter } from 'next/navigation'
 
@@ -37,6 +38,7 @@ export default function AccountsPage() {
     const [isDetailOpen, setIsDetailOpen] = useState(false)
     const [selectedAccount, setSelectedAccount] = useState<any>(null)
     const [isEditMode, setIsEditMode] = useState(false)
+    const [accountOrders, setAccountOrders] = useState<any[]>([]) // Orders for selected account
 
     // Add Form State
     const [addCarrier, setAddCarrier] = useState('VNMB')
@@ -81,6 +83,32 @@ export default function AccountsPage() {
             return () => clearTimeout(timer)
         }
     }, [toast])
+
+    // Fetch orders for selected account
+    const fetchAccountOrders = async (accountId: string) => {
+        try {
+            const res = await fetch(`/api/orders?accountId=${accountId}`)
+            const data = await res.json()
+            if (Array.isArray(data)) {
+                setAccountOrders(data)
+            } else {
+                console.error('Failed to fetch orders:', data)
+                setAccountOrders([])
+            }
+        } catch (e) {
+            console.error('Error fetching orders:', e)
+            setAccountOrders([])
+        }
+    }
+
+    // Fetch orders when detail modal opens
+    useEffect(() => {
+        if (isDetailOpen && selectedAccount) {
+            fetchAccountOrders(selectedAccount.id)
+        } else {
+            setAccountOrders([]) // Clear orders when modal closes
+        }
+    }, [isDetailOpen, selectedAccount])
 
     const copyToClipboard = (text: string, label: string, e?: React.MouseEvent) => {
         e?.stopPropagation() // Prevent row click if event exists
@@ -484,10 +512,11 @@ export default function AccountsPage() {
             {/* Responsive Styles */}
             <style jsx>{responsiveStyles}</style>
 
+
             {/* ADD MODAL */}
-            {isAddOpen && (
-                <div className="modal-overlay" style={modalOverlayStyle}>
-                    <div className="glass-card modal-content" style={modalContentStyle}>
+            {isAddOpen && createPortal(
+                <div className="modal-overlay" style={modalOverlayStyle} onClick={() => setIsAddOpen(false)}>
+                    <div className="modal-content" style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.5rem', margin: 0 }}>Thêm Tài Khoản Mới</h2>
                             <button
@@ -562,9 +591,13 @@ export default function AccountsPage() {
                                 </div>
                             </div>
 
+
                             <div>
                                 <label style={labelStyle}>Các Voucher đã dùng</label>
                                 <VoucherSelector name="vouchers" />
+                                <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                                    💡 Không cần tick, khi thêm đơn hàng sẽ tự tick, nếu quên đơn hàng thì tick.
+                                </p>
                             </div>
 
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
@@ -573,13 +606,14 @@ export default function AccountsPage() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* DETAIL MODAL */}
-            {isDetailOpen && selectedAccount && (
-                <div className="modal-overlay" style={modalOverlayStyle}>
-                    <div className="glass-card modal-content" style={modalContentStyle}>
+            {isDetailOpen && selectedAccount && createPortal(
+                <div className="modal-overlay" style={modalOverlayStyle} onClick={() => { setIsDetailOpen(false); setIsEditMode(false) }}>
+                    <div className="modal-content" style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.5rem', margin: 0 }}>
                                 {isEditMode ? 'Chỉnh sửa Tài Khoản' : 'Thông tin Tài Khoản'}
@@ -720,13 +754,88 @@ export default function AccountsPage() {
                                 )}
                             </div>
 
+                            {/* Orders List Section */}
+                            <div style={{ marginTop: '2rem', borderTop: '2px solid #e5e7eb', paddingTop: '1.5rem' }}>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
+                                    📦 Danh sách đơn hàng ({accountOrders.length})
+                                </h3>
+
+                                {accountOrders.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af', background: '#f9fafb', borderRadius: '8px' }}>
+                                        Chưa có đơn hàng nào
+                                    </div>
+                                ) : (
+                                    <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                            <thead style={{ position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
+                                                <tr>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600' }}>Tên đơn</th>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600' }}>Mã vận đơn</th>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600' }}>Voucher</th>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'right', borderBottom: '2px solid #e5e7eb', fontWeight: '600' }}>Giá</th>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '2px solid #e5e7eb', fontWeight: '600' }}>Trạng thái</th>
+                                                    <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontWeight: '600' }}>Ngày tạo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {accountOrders.map((order: any) => {
+                                                    const statusColors: any = {
+                                                        new: { bg: '#dbeafe', text: '#1e40af', label: 'Mới' },
+                                                        processing: { bg: '#fef3c7', text: '#92400e', label: 'Đang xử lý' },
+                                                        shipped: { bg: '#e0e7ff', text: '#3730a3', label: 'Đã gửi' },
+                                                        delivered: { bg: '#d1fae5', text: '#065f46', label: 'Đã giao' },
+                                                        cancelled: { bg: '#fee2e2', text: '#991b1b', label: 'Đã hủy' }
+                                                    }
+                                                    const statusStyle = statusColors[order.status] || statusColors.new
+
+                                                    return (
+                                                        <tr key={order.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                                            <td style={{ padding: '0.75rem' }} title={order.orderName || '-'}>
+                                                                {order.orderName ? (order.orderName.length > 8 ? order.orderName.substring(0, 8) + '...' : order.orderName) : '-'}
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{order.trackingNumber || '-'}</td>
+                                                            <td style={{ padding: '0.75rem' }}>
+                                                                {order.voucherUsed ? (
+                                                                    <span style={{ background: '#f3f4f6', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem' }}>
+                                                                        {order.voucherUsed}
+                                                                    </span>
+                                                                ) : '-'}
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: '600' }}>
+                                                                {order.finalPrice ? order.finalPrice.toLocaleString('vi-VN') + 'đ' : '-'}
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                                                <span style={{
+                                                                    background: statusStyle.bg,
+                                                                    color: statusStyle.text,
+                                                                    padding: '4px 12px',
+                                                                    borderRadius: '12px',
+                                                                    fontSize: '0.8rem',
+                                                                    fontWeight: '600'
+                                                                }}>
+                                                                    {statusStyle.label}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '0.75rem', fontSize: '0.85rem', color: '#6b7280' }}>
+                                                                {new Date(order.createdDate).toLocaleDateString('vi-VN')}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+
                             <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
                                 <button type="button" onClick={() => setIsDetailOpen(false)} style={btnSecondary}>Đóng</button>
                                 {isEditMode && <button type="submit" style={btnPrimary}>Lưu Thay Đổi</button>}
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     )
@@ -894,9 +1003,12 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 const modalOverlayStyle: React.CSSProperties = {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    position: 'fixed',
+    inset: 0, // Shorthand for top: 0, right: 0, bottom: 0, left: 0
     background: 'rgba(0,0,0,0.5)',
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 99999,
     backdropFilter: 'blur(4px)'
 }

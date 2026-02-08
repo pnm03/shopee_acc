@@ -87,8 +87,28 @@ export async function DELETE(
     try {
         const { id } = await params
 
-        await prisma.shopeeOrder.delete({
-            where: { id }
+        // Use transaction to ensure both order deletion and account update succeed together
+        await prisma.$transaction(async (tx) => {
+            // 1. Get the order to find the accountId
+            const order = await tx.shopeeOrder.findUnique({
+                where: { id },
+                select: { accountId: true }
+            })
+
+            if (!order) {
+                throw new Error('Order not found')
+            }
+
+            // 2. Delete the order
+            await tx.shopeeOrder.delete({
+                where: { id }
+            })
+
+            // 3. Decrement orderCount for the account
+            await tx.shopeeAccount.update({
+                where: { id: order.accountId },
+                data: { orderCount: { decrement: 1 } }
+            })
         })
 
         return NextResponse.json({ success: true })
