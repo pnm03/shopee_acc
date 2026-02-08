@@ -5,12 +5,10 @@ import { createPortal } from 'react-dom'
 import { createAccount, updateAccount, deleteAccount } from './actions'
 import { useRouter } from 'next/navigation'
 
-// Helper to calculate days status
-const getStatus = (createdAt: Date, manualStatus: string) => {
+// Helper to calculate account status
+const getStatus = (orderCount: number, manualStatus: string) => {
     if (manualStatus === 'banned') return 'banned'
-    const diffTime = Math.abs(new Date().getTime() - new Date(createdAt).getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 5 ? 'new' : 'active'
+    return orderCount > 0 ? 'active' : 'new'
 }
 
 type Account = {
@@ -380,7 +378,7 @@ export default function AccountsPage() {
                     </thead>
                     <tbody>
                         {filteredAccounts.map((acc, index) => {
-                            const status = getStatus(acc.createdAt, acc.status)
+                            const status = getStatus(acc.orderCount, acc.status)
                             return (
                                 <tr
                                     key={acc.id}
@@ -429,7 +427,7 @@ export default function AccountsPage() {
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#888' }}>Không tìm thấy tài khoản nào</div>
                 ) : (
                     filteredAccounts.map((acc, index) => {
-                        const effectiveStatus = getStatus(acc.createdAt, acc.status)
+                        const effectiveStatus = getStatus(acc.orderCount, acc.status)
                         const vouchersArray = acc.vouchers ? acc.vouchers.split(',').map((v: string) => v.trim()) : []
                         return (
                             <div
@@ -726,7 +724,7 @@ export default function AccountsPage() {
                                             <option value="banned">Đã khóa</option>
                                         </select>
                                     ) : (
-                                        <StatusBadge status={getStatus(selectedAccount.createdAt, selectedAccount.status)} />
+                                        <StatusBadge status={getStatus(selectedAccount.orderCount, selectedAccount.status)} />
                                     )}
                                 </div>
                                 <div>
@@ -788,12 +786,37 @@ export default function AccountsPage() {
                                                     }
                                                     const statusStyle = statusColors[order.status] || statusColors.new
 
+
                                                     return (
                                                         <tr key={order.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                                                            <td style={{ padding: '0.75rem' }} title={order.orderName || '-'}>
-                                                                {order.orderName ? (order.orderName.length > 8 ? order.orderName.substring(0, 8) + '...' : order.orderName) : '-'}
+                                                            <td style={{ padding: '0.75rem', position: 'relative' }}>
+                                                                <TooltipCell
+                                                                    text={order.orderName || '-'}
+                                                                    maxLength={8}
+                                                                />
                                                             </td>
-                                                            <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>{order.trackingNumber || '-'}</td>
+                                                            <td
+                                                                style={{
+                                                                    padding: '0.75rem',
+                                                                    fontFamily: 'monospace',
+                                                                    fontSize: '0.85rem',
+                                                                    cursor: order.trackingNumber ? 'pointer' : 'default',
+                                                                    color: order.trackingNumber ? '#111827' : '#6b7280',
+                                                                    position: 'relative'
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    if (order.trackingNumber) {
+                                                                        copyToClipboard(order.trackingNumber, 'Mã vận đơn', e)
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {order.trackingNumber ? (
+                                                                    <TooltipCell
+                                                                        text={order.trackingNumber}
+                                                                        maxLength={5}
+                                                                    />
+                                                                ) : '-'}
+                                                            </td>
                                                             <td style={{ padding: '0.75rem' }}>
                                                                 {order.voucherUsed ? (
                                                                     <span style={{ background: '#f3f4f6', padding: '2px 8px', borderRadius: '12px', fontSize: '0.8rem' }}>
@@ -918,6 +941,54 @@ function VoucherCell({ vouchersString }: { vouchersString: string | null }) {
                             {v}
                         </span>
                     ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// --- Tooltip Cell Component ---
+function TooltipCell({ text, maxLength = 10 }: { text: string, maxLength?: number }) {
+    const [showTooltip, setShowTooltip] = useState(false)
+    const truncated = text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+    const needsTruncation = text.length > maxLength
+
+    return (
+        <div
+            style={{ position: 'relative', display: 'inline-block' }}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+        >
+            <span>{truncated}</span>
+            {showTooltip && needsTruncation && (
+                <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '8px',
+                    padding: '8px 12px',
+                    background: '#1f2937',
+                    color: 'white',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    whiteSpace: 'nowrap',
+                    zIndex: 1000,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    pointerEvents: 'none'
+                }}>
+                    {text}
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '6px solid transparent',
+                        borderRight: '6px solid transparent',
+                        borderBottom: '6px solid #1f2937'
+                    }} />
                 </div>
             )}
         </div>
