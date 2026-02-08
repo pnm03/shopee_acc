@@ -120,6 +120,10 @@ export default function OrdersClient() {
     // Status change modal
     const [statusChangeModal, setStatusChangeModal] = useState<{ orderId: string, currentStatus: string } | null>(null)
 
+    // Tracking info
+    const [trackingInfo, setTrackingInfo] = useState<any>(null)
+    const [isLoadingTracking, setIsLoadingTracking] = useState(false)
+
     // Fetch orders
     useEffect(() => {
         fetchOrders()
@@ -149,6 +153,33 @@ export default function OrdersClient() {
             return () => clearTimeout(timer)
         }
     }, [toast])
+
+    // Fetch tracking info when detail modal opens
+    const fetchTrackingInfo = async (trackingNumber: string) => {
+        setIsLoadingTracking(true)
+        try {
+            const res = await fetch(`/api/tracking?trackingNumber=${encodeURIComponent(trackingNumber)}`)
+            if (res.ok) {
+                const data = await res.json()
+                setTrackingInfo(data)
+            } else {
+                setTrackingInfo(null)
+            }
+        } catch (e) {
+            console.error('Failed to fetch tracking info:', e)
+            setTrackingInfo(null)
+        } finally {
+            setIsLoadingTracking(false)
+        }
+    }
+
+    useEffect(() => {
+        if (isDetailOpen && selectedOrder?.trackingNumber) {
+            fetchTrackingInfo(selectedOrder.trackingNumber)
+        } else {
+            setTrackingInfo(null)
+        }
+    }, [isDetailOpen, selectedOrder])
 
     // Filtered orders
     const filteredOrders = orders.filter(order => {
@@ -661,216 +692,284 @@ export default function OrdersClient() {
             {/* DETAIL/EDIT MODAL */}
             {isDetailOpen && selectedOrder && (
                 <div className="modal-overlay" style={modalOverlayStyle}>
-                    <div className="glass-card modal-content" style={modalContentStyle}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                            <h2 style={{ fontSize: '1.5rem', margin: 0 }}>
+                    <div className="glass-card modal-content" style={{ ...modalContentStyle, padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: '90vh', width: '90%', maxWidth: '800px' }}>
+
+                        {/* HEADER - Fixed */}
+                        <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', zIndex: 10 }}>
+                            <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700, color: '#111827' }}>
                                 {isEditMode ? 'Chỉnh sửa Đơn hàng' : 'Thông tin Đơn hàng'}
                             </h2>
                             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                 {!isEditMode ? (
                                     <>
-                                        <button onClick={() => setIsEditMode(true)} style={{ ...btnSecondary, color: '#2563eb' }}>✏️ Sửa</button>
-                                        <button onClick={handleDelete} style={{ ...btnSecondary, color: '#dc2626' }}>🗑️ Xóa</button>
+                                        <button onClick={() => setIsEditMode(true)} style={{ ...btnSecondary, color: '#2563eb', padding: '0.5rem 1rem', fontSize: '0.9rem' }}>✏️ Sửa</button>
+                                        <button onClick={handleDelete} style={{ ...btnSecondary, color: '#dc2626', padding: '0.5rem 1rem', fontSize: '0.9rem' }}>🗑️ Xóa</button>
                                     </>
                                 ) : null}
                                 <button
                                     onClick={() => { setIsDetailOpen(false); setIsEditMode(false) }}
-                                    style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280' }}
+                                    style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#6b7280', padding: '0.25rem', lineHeight: 1 }}
                                 >
                                     ✕
                                 </button>
                             </div>
                         </div>
-                        <form onSubmit={handleUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {/* Account Selection */}
-                            <div>
-                                <label style={labelStyle}>Tài khoản</label>
-                                {isEditMode ? (
-                                    <>
-                                        <select
-                                            name="accountId"
-                                            required
-                                            value={selectedAccountId}
-                                            onChange={(e) => setSelectedAccountId(e.target.value)}
-                                            style={inputStyle}
-                                        >
-                                            {accounts.map(acc => (
-                                                <option key={acc.id} value={acc.id}>
-                                                    {acc.name || acc.username} - {acc.username} ({acc.carrier || 'N/A'})
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {selectedAccount && (
-                                            <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#f0f9ff', borderRadius: '6px', fontSize: '0.9rem' }}>
-                                                <div><strong>Username:</strong> {selectedAccount.username}</div>
-                                                <div><strong>Password:</strong> {selectedAccount.password || '******'}</div>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div style={{ padding: '0.75rem', background: '#f9fafb', borderRadius: '8px' }}>
-                                        <div><strong>{selectedOrder.account?.name || selectedOrder.account?.username}</strong></div>
-                                        <div style={{ fontSize: '0.9rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                            Username: {selectedOrder.account?.username} | Password: {selectedOrder.account?.password || '******'}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        {/* BODY - Scrollable */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', background: '#fff' }}>
+                            <form id="detail-form" onSubmit={handleUpdateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                                {/* Account Selection */}
                                 <div>
-                                    <label style={labelStyle}>Tên đơn hàng</label>
-                                    <input
-                                        name="orderName"
-                                        defaultValue={selectedOrder.orderName}
-                                        disabled={!isEditMode}
-                                        style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
-                                        onClick={(e) => {
-                                            if (!isEditMode) {
-                                                navigator.clipboard.writeText(selectedOrder.orderName)
-                                                setToast({ message: 'Đã copy tên đơn hàng', type: 'success' })
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>Mã vận đơn</label>
-                                    <input
-                                        name="trackingNumber"
-                                        defaultValue={selectedOrder.trackingNumber || ''}
-                                        disabled={!isEditMode}
-                                        style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
-                                        onClick={(e) => {
-                                            if (!isEditMode && selectedOrder.trackingNumber) {
-                                                navigator.clipboard.writeText(selectedOrder.trackingNumber)
-                                                setToast({ message: 'Đã copy mã vận đơn', type: 'success' })
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                                    <label style={labelStyle}>Ngày tạo</label>
-                                    <input
-                                        name="createdDate"
-                                        type="date"
-                                        defaultValue={selectedOrder.createdDate?.split('T')[0] || ''}
-                                        disabled={!isEditMode}
-                                        style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
-                                        onClick={(e) => {
-                                            if (!isEditMode) {
-                                                navigator.clipboard.writeText(selectedOrder.createdDate?.split('T')[0] || '')
-                                                setToast({ message: 'Đã copy ngày tạo', type: 'success' })
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>Địa chỉ</label>
-                                    <input
-                                        name="address"
-                                        defaultValue={selectedOrder.address || ''}
-                                        disabled={!isEditMode}
-                                        style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
-                                        onClick={(e) => {
-                                            if (!isEditMode && selectedOrder.address) {
-                                                navigator.clipboard.writeText(selectedOrder.address)
-                                                setToast({ message: 'Đã copy địa chỉ', type: 'success' })
-                                            }
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                                    <label style={labelStyle}>Voucher đã dùng</label>
+                                    <label style={labelStyle}>Tài khoản</label>
                                     {isEditMode ? (
-                                        <select name="voucherUsed" defaultValue={selectedOrder.voucherUsed || ''} style={inputStyle}>
-                                            <option value="">-- Chọn voucher --</option>
-                                            {VOUCHER_OPTIONS.map(v => (
-                                                <option key={v} value={v}>{v}</option>
-                                            ))}
-                                        </select>
+                                        <>
+                                            <select
+                                                name="accountId"
+                                                required
+                                                value={selectedAccountId}
+                                                onChange={(e) => setSelectedAccountId(e.target.value)}
+                                                style={inputStyle}
+                                            >
+                                                {accounts.map(acc => (
+                                                    <option key={acc.id} value={acc.id}>
+                                                        {acc.name || acc.username} - {acc.username} ({acc.carrier || 'N/A'})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {selectedAccount && (
+                                                <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: '#f0f9ff', borderRadius: '6px', fontSize: '0.9rem' }}>
+                                                    <div><strong>Username:</strong> {selectedAccount.username}</div>
+                                                    <div><strong>Password:</strong> {selectedAccount.password || '******'}</div>
+                                                </div>
+                                            )}
+                                        </>
                                     ) : (
+                                        <div style={{ padding: '0.75rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                                            <div style={{ fontWeight: 500 }}>{selectedOrder.account?.name || selectedOrder.account?.username}</div>
+                                            <div style={{ fontSize: '0.9rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                                ID: {selectedOrder.account?.username} | Pass: {selectedOrder.account?.password || '******'}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={labelStyle}>Tên đơn hàng</label>
                                         <input
-                                            name="voucherUsed"
-                                            defaultValue={selectedOrder.voucherUsed || ''}
-                                            disabled
-                                            style={{ ...disabledInputStyle, cursor: 'copy' }}
+                                            name="orderName"
+                                            defaultValue={selectedOrder.orderName}
+                                            disabled={!isEditMode}
+                                            style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
                                             onClick={(e) => {
-                                                if (selectedOrder.voucherUsed) {
-                                                    navigator.clipboard.writeText(selectedOrder.voucherUsed)
-                                                    setToast({ message: 'Đã copy voucher', type: 'success' })
+                                                if (!isEditMode) {
+                                                    navigator.clipboard.writeText(selectedOrder.orderName)
+                                                    setToast({ message: 'Đã copy tên đơn hàng', type: 'success' })
                                                 }
                                             }}
                                         />
-                                    )}
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Mã vận đơn</label>
+                                        <input
+                                            name="trackingNumber"
+                                            defaultValue={selectedOrder.trackingNumber || ''}
+                                            disabled={!isEditMode}
+                                            style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
+                                            onClick={(e) => {
+                                                if (!isEditMode && selectedOrder.trackingNumber) {
+                                                    navigator.clipboard.writeText(selectedOrder.trackingNumber)
+                                                    setToast({ message: 'Đã copy mã vận đơn', type: 'success' })
+                                                }
+                                            }}
+                                        />
+                                    </div>
                                 </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={labelStyle}>Ngày tạo</label>
+                                        <input
+                                            name="createdDate"
+                                            type="date"
+                                            defaultValue={selectedOrder.createdDate?.split('T')[0] || ''}
+                                            disabled={!isEditMode}
+                                            style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
+                                            onClick={(e) => {
+                                                if (!isEditMode) {
+                                                    navigator.clipboard.writeText(selectedOrder.createdDate?.split('T')[0] || '')
+                                                    setToast({ message: 'Đã copy ngày tạo', type: 'success' })
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Địa chỉ</label>
+                                        <input
+                                            name="address"
+                                            defaultValue={selectedOrder.address || ''}
+                                            disabled={!isEditMode}
+                                            style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
+                                            onClick={(e) => {
+                                                if (!isEditMode && selectedOrder.address) {
+                                                    navigator.clipboard.writeText(selectedOrder.address)
+                                                    setToast({ message: 'Đã copy địa chỉ', type: 'success' })
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={labelStyle}>Voucher đã dùng</label>
+                                        {isEditMode ? (
+                                            <select name="voucherUsed" defaultValue={selectedOrder.voucherUsed || ''} style={inputStyle}>
+                                                <option value="">-- Chọn voucher --</option>
+                                                {VOUCHER_OPTIONS.map(v => (
+                                                    <option key={v} value={v}>{v}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <input
+                                                name="voucherUsed"
+                                                defaultValue={selectedOrder.voucherUsed || ''}
+                                                disabled
+                                                style={{ ...disabledInputStyle, cursor: 'copy' }}
+                                                onClick={(e) => {
+                                                    if (selectedOrder.voucherUsed) {
+                                                        navigator.clipboard.writeText(selectedOrder.voucherUsed)
+                                                        setToast({ message: 'Đã copy voucher', type: 'success' })
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Loại mặt hàng</label>
+                                        <input
+                                            name="productCategory"
+                                            defaultValue={selectedOrder.productCategory || ''}
+                                            disabled={!isEditMode}
+                                            style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
+                                            onClick={(e) => {
+                                                if (!isEditMode && selectedOrder.productCategory) {
+                                                    navigator.clipboard.writeText(selectedOrder.productCategory)
+                                                    setToast({ message: 'Đã copy loại mặt hàng', type: 'success' })
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <label style={labelStyle}>Loại mặt hàng</label>
-                                    <input
-                                        name="productCategory"
-                                        defaultValue={selectedOrder.productCategory || ''}
-                                        disabled={!isEditMode}
-                                        style={isEditMode ? inputStyle : { ...disabledInputStyle, cursor: 'copy' }}
-                                        onClick={(e) => {
-                                            if (!isEditMode && selectedOrder.productCategory) {
-                                                navigator.clipboard.writeText(selectedOrder.productCategory)
-                                                setToast({ message: 'Đã copy loại mặt hàng', type: 'success' })
-                                            }
+                                    <label style={labelStyle}>Link sản phẩm</label>
+                                    <input name="productLink" defaultValue={selectedOrder.productLink || ''} disabled={!isEditMode} style={isEditMode ? inputStyle : disabledInputStyle} />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={labelStyle}>Số lượng</label>
+                                        <input name="quantity" type="number" defaultValue={selectedOrder.quantity} min={1} disabled={!isEditMode} style={isEditMode ? inputStyle : disabledInputStyle} />
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Giá cuối cùng</label>
+                                        <input
+                                            name="finalPrice"
+                                            type="text"
+                                            defaultValue={selectedOrder.finalPrice?.toLocaleString('vi-VN') || ''}
+                                            disabled={!isEditMode}
+                                            style={isEditMode ? inputStyle : disabledInputStyle}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label style={labelStyle}>Trạng thái</label>
+                                    <select name="status" value={orderStatus} onChange={(e) => setOrderStatus(e.target.value)} disabled={!isEditMode} style={isEditMode ? inputStyle : disabledInputStyle}>
+                                        {STATUS_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {orderStatus === 'cancelled' && (
+                                    <div>
+                                        <label style={labelStyle}>Lý do hủy</label>
+                                        <textarea name="cancellationReason" defaultValue={selectedOrder.cancellationReason || ''} disabled={!isEditMode} rows={3} style={isEditMode ? inputStyle : disabledInputStyle} />
+                                    </div>
+                                )}
+                            </form>
+                        </div>
+
+                        {/* FOOTER - Fixed */}
+                        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                            {isEditMode ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsEditMode(false)
+                                            setEditForm(selectedOrder)
                                         }}
-                                    />
-                                </div>
-                            </div>
+                                        style={btnSecondary}
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        form="detail-form"
+                                        style={{ ...btnPrimary, flex: 'none', minWidth: '140px' }}
+                                    >
+                                        Lưu thay đổi
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsDetailOpen(false)}
+                                        style={{
+                                            ...btnSecondary,
+                                            background: 'white',
+                                            border: '1px solid #d1d5db'
+                                        }}
+                                    >
+                                        Đóng
+                                    </button>
 
-                            <div>
-                                <label style={labelStyle}>Link sản phẩm</label>
-                                <input name="productLink" defaultValue={selectedOrder.productLink || ''} disabled={!isEditMode} style={isEditMode ? inputStyle : disabledInputStyle} />
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <div>
-                                    <label style={labelStyle}>Số lượng</label>
-                                    <input name="quantity" type="number" defaultValue={selectedOrder.quantity} min={1} disabled={!isEditMode} style={isEditMode ? inputStyle : disabledInputStyle} />
-                                </div>
-                                <div>
-                                    <label style={labelStyle}>Giá cuối cùng</label>
-                                    <input
-                                        name="finalPrice"
-                                        type="text"
-                                        defaultValue={selectedOrder.finalPrice?.toLocaleString('vi-VN') || ''}
-                                        disabled={!isEditMode}
-                                        style={isEditMode ? inputStyle : disabledInputStyle}
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label style={labelStyle}>Trạng thái</label>
-                                <select name="status" value={orderStatus} onChange={(e) => setOrderStatus(e.target.value)} disabled={!isEditMode} style={isEditMode ? inputStyle : disabledInputStyle}>
-                                    {STATUS_OPTIONS.map(opt => (
-                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {orderStatus === 'cancelled' && (
-                                <div>
-                                    <label style={labelStyle}>Lý do hủy</label>
-                                    <textarea name="cancellationReason" defaultValue={selectedOrder.cancellationReason || ''} disabled={!isEditMode} rows={3} style={isEditMode ? inputStyle : disabledInputStyle} />
-                                </div>
+                                    {selectedOrder.trackingNumber && (
+                                        <a
+                                            href={`https://spx.vn/track?${selectedOrder.trackingNumber}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                padding: '0.75rem 1.5rem',
+                                                background: '#ea580c',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                fontWeight: 600,
+                                                textDecoration: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem',
+                                                transition: 'background 0.2s',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.background = '#c2410c'}
+                                            onMouseOut={(e) => e.currentTarget.style.background = '#ea580c'}
+                                        >
+                                            <span>Xem vận đơn SPX</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                            </svg>
+                                        </a>
+                                    )}
+                                </>
                             )}
-
-                            {isEditMode && (
-                                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                                    <button type="submit" style={btnPrimary}>Lưu thay đổi</button>
-                                    <button type="button" onClick={() => setIsEditMode(false)} style={btnSecondary}>Hủy</button>
-                                </div>
-                            )}
-                        </form>
+                        </div>
                     </div>
                 </div>
             )}
