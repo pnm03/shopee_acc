@@ -212,7 +212,7 @@ export default function AccountsPage() {
         // Computed status logic for display (or use DB status if strictly managed)
         // Requirement: "Auto status". I'll use the logic here for display if DB isn't updated by a cron.
         // Real logic: DB status dominates if 'banned'. Else check date.
-        const effectiveStatus = getStatus(acc.createdAt, acc.status)
+        const effectiveStatus = getStatus(acc.orderCount, acc.status)
 
         const matchStatus = filterStatus === 'All' || effectiveStatus === filterStatus
             || (filterStatus === 'active' && effectiveStatus === 'active')
@@ -226,8 +226,8 @@ export default function AccountsPage() {
         return matchCarrier && matchStatus
     }).sort((a, b) => {
         // Move locked accounts to bottom
-        const statusA = getStatus(a.createdAt, a.status)
-        const statusB = getStatus(b.createdAt, b.status)
+        const statusA = getStatus(a.orderCount, a.status)
+        const statusB = getStatus(b.orderCount, b.status)
 
         if (statusA === 'banned' && statusB !== 'banned') return 1
         if (statusA !== 'banned' && statusB === 'banned') return -1

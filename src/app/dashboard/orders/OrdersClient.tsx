@@ -271,7 +271,7 @@ export default function OrdersClient() {
             productLink: formData.get('productLink'),
             quantity: parseInt(formData.get('quantity') as string) || 1,
             productCategory: formData.get('productCategory'),
-            finalPrice: parseFloat(formData.get('finalPrice') as string) || 0,
+            finalPrice: parseFloat((formData.get('finalPrice') as string).replace(/\./g, '').replace(',', '.')) || 0,
             status: formData.get('status'),
             cancellationReason: formData.get('cancellationReason') || null
         }
