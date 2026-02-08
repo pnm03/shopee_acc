@@ -910,7 +910,6 @@ export default function OrdersClient() {
                                         type="button"
                                         onClick={() => {
                                             setIsEditMode(false)
-                                            setEditForm(selectedOrder)
                                         }}
                                         style={btnSecondary}
                                     >
