@@ -93,7 +93,64 @@ const STATUS_OPTIONS = [
     { value: 'cancelled', label: 'Đã hủy' }
 ]
 
-const VOUCHER_OPTIONS = ['10.000', '20.000', '80.000', '100.000']
+const VOUCHER_OPTIONS = ['10.000', '15.000', '20.000', '60.000', '80.000', '100.000']
+
+function VoucherInput({ name, defaultValue, disabled, style }: { name: string, defaultValue?: string, disabled?: boolean, style?: React.CSSProperties }) {
+    const isPreset = defaultValue && VOUCHER_OPTIONS.includes(defaultValue)
+    const [mode, setMode] = useState(isPreset || !defaultValue ? 'select' : 'custom')
+    const [value, setValue] = useState(defaultValue || '')
+
+    // Sync with preset options if mode is select
+    const selectValue = mode === 'select' ? (VOUCHER_OPTIONS.includes(value) ? value : '') : 'custom'
+
+    // Update internal state when defaultValue changes (important for re-opening modals)
+    useEffect(() => {
+        if (defaultValue) {
+            setValue(defaultValue)
+            setMode(VOUCHER_OPTIONS.includes(defaultValue) ? 'select' : 'custom')
+        }
+    }, [defaultValue])
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <select
+                disabled={disabled}
+                value={selectValue}
+                onChange={(e) => {
+                    const val = e.target.value
+                    if (val === 'custom') {
+                        setMode('custom')
+                        setValue('')
+                    } else {
+                        setMode('select')
+                        setValue(val)
+                    }
+                }}
+                style={style}
+            >
+                <option value="">-- Chọn voucher --</option>
+                {VOUCHER_OPTIONS.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                ))}
+                <option value="custom">-- Tự nhập (Khác) --</option>
+            </select>
+
+            {mode === 'custom' && (
+                <input
+                    type="text"
+                    placeholder="Nhập giá trị voucher (VD: 50.000)"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    disabled={disabled}
+                    style={style}
+                />
+            )}
+
+            <input type="hidden" name={name} value={value} />
+        </div>
+    )
+}
+
 
 export default function OrdersClient() {
     const router = useRouter()
@@ -107,6 +164,8 @@ export default function OrdersClient() {
     const [isDetailOpen, setIsDetailOpen] = useState(false)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
     const [isEditMode, setIsEditMode] = useState(false)
+    const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
+    const [showCompleted, setShowCompleted] = useState(false)
 
     // Form state
     const [selectedAccountId, setSelectedAccountId] = useState('')
@@ -185,8 +244,81 @@ export default function OrdersClient() {
     const filteredOrders = orders.filter(order => {
         const matchesSearch = order.orderName?.toLowerCase().includes(searchTerm.toLowerCase()) ?? true
         const matchesStatus = statusFilter === 'All' || order.status === statusFilter
+
+        if (statusFilter === 'All' && !showCompleted && order.status === 'completed') {
+            return false
+        }
+
         return matchesSearch && matchesStatus
     })
+
+    const completedCount = orders.filter(o => o.status === 'completed').length
+
+    // Clear selection on filter change
+    useEffect(() => {
+        setSelectedOrderIds([])
+    }, [searchTerm, statusFilter])
+
+    const toggleSelectAll = () => {
+        if (selectedOrderIds.length === filteredOrders.length && filteredOrders.length > 0) {
+            setSelectedOrderIds([])
+        } else {
+            setSelectedOrderIds(filteredOrders.map(o => o.id))
+        }
+    }
+
+    const toggleSelectOrder = (id: string) => {
+        if (selectedOrderIds.includes(id)) {
+            setSelectedOrderIds(prev => prev.filter(oid => oid !== id))
+        } else {
+            setSelectedOrderIds(prev => [...prev, id])
+        }
+    }
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Bạn có chắc muốn xóa ${selectedOrderIds.length} đơn hàng đang chọn?`)) return
+
+        try {
+            const res = await fetch('/api/orders/bulk', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedOrderIds })
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                setToast({ message: `Đã xóa ${data.count} đơn hàng`, type: 'success' })
+                setSelectedOrderIds([])
+                fetchOrders()
+                fetchAccounts()
+            } else {
+                setToast({ message: 'Lỗi khi xóa đơn hàng', type: 'error' })
+            }
+        } catch (e) {
+            setToast({ message: 'Lỗi kết nối', type: 'error' })
+        }
+    }
+
+    const handleBulkStatusChange = async (status: string) => {
+        try {
+            const res = await fetch('/api/orders/bulk', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedOrderIds, status })
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                setToast({ message: `Đã cập nhật ${data.count} đơn hàng`, type: 'success' })
+                setSelectedOrderIds([])
+                fetchOrders()
+            } else {
+                setToast({ message: 'Lỗi khi cập nhật trạng thái', type: 'error' })
+            }
+        } catch (e) {
+            setToast({ message: 'Lỗi kết nối', type: 'error' })
+        }
+    }
 
     // Price formatting
     const formatPrice = (value: string) => {
@@ -232,20 +364,10 @@ export default function OrdersClient() {
         })
 
         if (res.ok) {
-            // Update account voucher if voucher was used
-            const voucherUsed = formData.get('voucherUsed') as string
-            const accountId = formData.get('accountId') as string
-            if (voucherUsed && accountId) {
-                await fetch(`/api/accounts/${accountId}/add-voucher`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ voucher: voucherUsed })
-                })
-            }
-
             setToast({ message: 'Tạo đơn hàng thành công!', type: 'success' })
             setIsCreateOpen(false)
             fetchOrders()
+            fetchAccounts()
             setSelectedAccountId('')
             setOrderStatus('new')
             setPriceDisplay('')
@@ -287,6 +409,7 @@ export default function OrdersClient() {
             setToast({ message: 'Cập nhật đơn hàng thành công!', type: 'success' })
             setIsEditMode(false)
             fetchOrders()
+            fetchAccounts()
         } else {
             const errorData = await res.json().catch(() => ({}))
             const errorMsg = `Lỗi ${res.status}: ${errorData.error || 'Không xác định'} | Details: ${JSON.stringify(errorData.details || {})}`
@@ -298,15 +421,6 @@ export default function OrdersClient() {
     const handleDelete = async () => {
         if (!selectedOrder || !confirm('Bạn có chắc muốn xóa đơn hàng này?')) return
 
-        // Remove voucher from account if it was used
-        if (selectedOrder.voucherUsed && selectedOrder.accountId) {
-            await fetch(`/api/accounts/${selectedOrder.accountId}/remove-voucher`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ voucher: selectedOrder.voucherUsed })
-            })
-        }
-
         const res = await fetch(`/api/orders/${selectedOrder.id}`, {
             method: 'DELETE'
         })
@@ -316,6 +430,7 @@ export default function OrdersClient() {
             setIsDetailOpen(false)
             setSelectedOrder(null)
             fetchOrders()
+            fetchAccounts()
         } else {
             setToast({ message: 'Lỗi khi xóa đơn hàng', type: 'error' })
         }
@@ -381,21 +496,40 @@ export default function OrdersClient() {
             {/* Header */}
             <div className="orders-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <h1 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>📦 Quản lý Đơn hàng</h1>
-                <button
-                    onClick={() => setIsCreateOpen(true)}
-                    className="add-button"
-                    style={{
-                        background: '#ee4d2d',
-                        color: 'white',
-                        padding: '0.75rem 1.5rem',
-                        borderRadius: '8px',
-                        border: 'none',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                    }}
-                >
-                    + Tạo Đơn Hàng
-                </button>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <button
+                        onClick={() => setShowCompleted(!showCompleted)}
+                        style={{
+                            background: showCompleted ? '#e5e7eb' : 'white',
+                            color: showCompleted ? '#374151' : '#6b7280',
+                            border: '1px solid #d1d5db',
+                            padding: '0.75rem 1rem',
+                            borderRadius: '8px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem'
+                        }}
+                    >
+                        {showCompleted ? 'Ẩn đơn ĐHT' : `Hiện đơn ĐHT [${completedCount}]`}
+                    </button>
+                    <button
+                        onClick={() => setIsCreateOpen(true)}
+                        className="add-button"
+                        style={{
+                            background: '#ee4d2d',
+                            color: 'white',
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: '8px',
+                            border: 'none',
+                            fontWeight: '600',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        + Tạo Đơn Hàng
+                    </button>
+                </div>
             </div>
 
             {/* Search and Filters */}
@@ -439,6 +573,14 @@ export default function OrdersClient() {
                 <table className="glass-card" style={{ width: '100%', borderCollapse: 'collapse', background: 'white', borderRadius: '12px' }}>
                     <thead>
                         <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                            <th style={{ ...thStyle, width: '40px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={filteredOrders.length > 0 && selectedOrderIds.length === filteredOrders.length}
+                                    onChange={toggleSelectAll}
+                                    disabled={filteredOrders.length === 0}
+                                />
+                            </th>
                             <th style={thStyle}>#</th>
                             <th style={thStyle}>Tên đơn hàng</th>
                             <th style={thStyle}>Mã vận đơn</th>
@@ -468,9 +610,15 @@ export default function OrdersClient() {
                                         setSelectedAccountId(order.accountId)
                                         setOrderStatus(order.status)
                                     }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
                                     onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                                 >
+                                    <td style={{ ...tdStyle, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedOrderIds.includes(order.id)}
+                                            onChange={() => toggleSelectOrder(order.id)}
+                                        />
+                                    </td>
                                     <td style={tdStyle}>{index + 1}</td>
                                     <td style={tdStyle}>
                                         <TooltipCell text={order.orderName} />
@@ -629,12 +777,7 @@ export default function OrdersClient() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 <div>
                                     <label style={labelStyle}>Voucher đã dùng</label>
-                                    <select name="voucherUsed" style={inputStyle}>
-                                        <option value="">-- Chọn voucher --</option>
-                                        {VOUCHER_OPTIONS.map(v => (
-                                            <option key={v} value={v}>{v}</option>
-                                        ))}
-                                    </select>
+                                    <VoucherInput name="voucherUsed" style={inputStyle} />
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Loại mặt hàng</label>
@@ -824,12 +967,7 @@ export default function OrdersClient() {
                                     <div>
                                         <label style={labelStyle}>Voucher đã dùng</label>
                                         {isEditMode ? (
-                                            <select name="voucherUsed" defaultValue={selectedOrder.voucherUsed || ''} style={inputStyle}>
-                                                <option value="">-- Chọn voucher --</option>
-                                                {VOUCHER_OPTIONS.map(v => (
-                                                    <option key={v} value={v}>{v}</option>
-                                                ))}
-                                            </select>
+                                            <VoucherInput name="voucherUsed" defaultValue={selectedOrder.voucherUsed || ''} style={inputStyle} />
                                         ) : (
                                             <input
                                                 name="voucherUsed"
@@ -1004,6 +1142,48 @@ export default function OrdersClient() {
                     </div>
                 </div>
             )}
+
+            {/* Bulk Actions Bar */}
+            {selectedOrderIds.length > 0 && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '2rem',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'white',
+                    padding: '1rem 2rem',
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                    display: 'flex',
+                    gap: '1.5rem',
+                    alignItems: 'center',
+                    zIndex: 9999,
+                    border: '1px solid #e5e7eb',
+                    maxWidth: '90%'
+                }}>
+                    <div style={{ fontWeight: 600, color: '#111827', whiteSpace: 'nowrap' }}>
+                        Đã chọn <span style={{ color: '#ee4d2d' }}>{selectedOrderIds.length}</span> đơn
+                    </div>
+
+                    <div style={{ height: '24px', width: '1px', background: '#e5e7eb' }}></div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {/* Status Buttons */}
+                        <button onClick={() => handleBulkStatusChange('picking')} style={{ ...btnSecondary, fontSize: '0.85rem', padding: '0.5rem 1rem' }}>Lấy hàng</button>
+                        <button onClick={() => handleBulkStatusChange('shipping')} style={{ ...btnSecondary, fontSize: '0.85rem', padding: '0.5rem 1rem' }}>Vận chuyển</button>
+                        <button onClick={() => handleBulkStatusChange('completed')} style={{ ...btnSecondary, background: '#dcfce7', color: '#166534', borderColor: '#bbf7d0', fontSize: '0.85rem', padding: '0.5rem 1rem' }}>Hoàn thành</button>
+
+                        <div style={{ width: '12px' }}></div>
+
+                        <button onClick={handleBulkDelete} style={{ ...btnSecondary, background: '#fee2e2', color: '#991b1b', borderColor: '#fecaca', fontSize: '0.85rem', padding: '0.5rem 1rem' }}>
+                            🗑️ Xóa ({selectedOrderIds.length})
+                        </button>
+
+                        <button onClick={() => setSelectedOrderIds([])} style={{ ...btnSecondary, border: 'none', color: '#6b7280', fontSize: '0.85rem' }}>Hủy chọn</button>
+                    </div>
+                </div>
+            )}
+
         </div>
     )
 }

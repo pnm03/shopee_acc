@@ -949,49 +949,18 @@ function VoucherCell({ vouchersString }: { vouchersString: string | null }) {
 
 // --- Tooltip Cell Component ---
 function TooltipCell({ text, maxLength = 10 }: { text: string, maxLength?: number }) {
-    const [showTooltip, setShowTooltip] = useState(false)
     const truncated = text.length > maxLength ? text.substring(0, maxLength) + '...' : text
-    const needsTruncation = text.length > maxLength
 
     return (
-        <div
-            style={{ position: 'relative', display: 'inline-block' }}
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
+        <span
+            title={text}
+            style={{
+                cursor: text.length > maxLength ? 'help' : 'default',
+                display: 'inline-block'
+            }}
         >
-            <span>{truncated}</span>
-            {showTooltip && needsTruncation && (
-                <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    marginTop: '8px',
-                    padding: '8px 12px',
-                    background: '#1f2937',
-                    color: 'white',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    whiteSpace: 'nowrap',
-                    zIndex: 1000,
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                    pointerEvents: 'none'
-                }}>
-                    {text}
-                    <div style={{
-                        position: 'absolute',
-                        bottom: '100%',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: 0,
-                        height: 0,
-                        borderLeft: '6px solid transparent',
-                        borderRight: '6px solid transparent',
-                        borderBottom: '6px solid #1f2937'
-                    }} />
-                </div>
-            )}
-        </div>
+            {truncated}
+        </span>
     )
 }
 

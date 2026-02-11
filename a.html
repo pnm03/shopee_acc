@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>May Coffee Menu Balanced</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-paper: #fffcf5;
+            --text-dark: #2c1a1d;
+            --text-light: #5d4037;
+            --gold-accent: #c5a059;
+        }
+
+        body {
+            background-color: #e0e0e0;
+            /* Màu nền ngoài trình duyệt */
+            display: flex;
+            justify-content: center;
+            padding: 40px;
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .menu-paper {
+            width: 1000px;
+            background-color: var(--bg-paper);
+            padding: 60px 80px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+            position: relative;
+            /* Tạo texture giấy */
+            background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='%23d7ccc8' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
+        /* Khung viền kép tạo độ sang */
+        .border-frame {
+            border: 2px solid var(--text-dark);
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: calc(100% - 24px);
+            height: calc(100% - 24px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .border-inner {
+            border: 1px solid var(--gold-accent);
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            width: calc(100% - 36px);
+            height: calc(100% - 36px);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            position: relative;
+            z-index: 2;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            font-size: 4rem;
+            margin: 0;
+            color: var(--text-dark);
+            letter-spacing: 5px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-top: 10px;
+            color: var(--text-light);
+            border-top: 1px solid var(--gold-accent);
+            border-bottom: 1px solid var(--gold-accent);
+            display: inline-block;
+            padding: 5px 20px;
+        }
+
+        /* Layout Grid 3 Cột Cân Bằng */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 60px;
+            /* Khoảng cách giữa các cột lớn hơn cho thoáng */
+            position: relative;
+            z-index: 2;
+        }
+
+        .category {
+            margin-bottom: 35px;
+        }
+
+        h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.4rem;
+            color: var(--text-dark);
+            border-bottom: 2px solid var(--text-dark);
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            color: var(--text-light);
+        }
+
+        .item-name {
+            font-weight: 500;
+            background: var(--bg-paper);
+            padding-right: 5px;
+            z-index: 2;
+        }
+
+        .dots {
+            flex-grow: 1;
+            border-bottom: 1px dotted #aaa;
+            margin-bottom: 5px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .price {
+            font-weight: 700;
+            color: var(--text-dark);
+            background: var(--bg-paper);
+            padding-left: 5px;
+            z-index: 2;
+        }
+
+        /* Phần Topping Footer */
+        .footer-topping {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid var(--gold-accent);
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .footer-topping h3 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            display: inline-block;
+            background: var(--bg-paper);
+            padding: 0 20px;
+            position: relative;
+            top: -42px;
+            /* Đẩy tiêu đề lên đè lên đường kẻ */
+        }
+
+        .topping-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px 30px;
+            /* Khoảng cách hàng/cột */
+            margin-top: -20px;
+        }
+
+        .topping-item {
+            font-size: 0.95rem;
+            color: var(--text-light);
+        }
+
+        .topping-item::before {
+            content: "♦";
+            color: var(--gold-accent);
+            font-size: 0.8rem;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="menu-paper">
+        <div class="border-frame"></div>
+        <div class="border-inner"></div>
+
+        <header>
+            <h1>MAY COFFEE</h1>
+            <div class="subtitle">Open: 07:00 AM - Close: 22:00 PM</div>
+        </header>
+
+        <div class="main-content">
+            <!-- CỘT 1: Cà phê & Đồ nóng (Nhóm Cafein & Ấm) -->
+            <div class="col">
+                <div class="category">
+                    <h2>Cafe</h2>
+                    <div class="item"><span class="item-name">Nâu đá</span><span class="dots"></span><span
+                            class="price">35k</span></div>
+                    <div class="item"><span class="item-name">Đen đá</span><span class="dots"></span><span
+                            class="price">35k</span></div>
+                    <div class="item"><span class="item-name">Bạc xỉu</span><span class="dots"></span><span
+                            class="price">40k</span></div>
+                    <div class="item"><span class="item-name">Cafe kem muối</span><span class="dots"></span><span
+                            class="price">45k</span></div>
+                </div>
+
+                <div class="category">
+                    <h2>Đồ Uống Nóng</h2>
+                    <div class="item"><span class="item-name">Trà gừng</span><span class="dots"></span><span
+                            class="price">40k</span></div>
+                    <div class="item"><span class="item-name">Cacao nóng</span><span class="dots"></span><span
+                            class="price">45k</span></div>
+                </div>
+            </div>
+
+            <!-- CỘT 2: Các loại Trà & Nước ép (Nhóm Thanh mát) -->
+            <div class="col">
+                <div class="category">
+                    <h2>Trà Hoa Quả</h2>
+                    <div class="item"><span class="item-name">Trà sen vàng</span><span class="dots"></span><span
+                            class="price">50k</span></div>
+                </div>
+
+                <div class="category">
+                    <h2>Trà Theo Mùa</h2>
+                    <div class="item"><span class="item-name">Trà thạch đào nhiệt đới</span><span
+                            class="dots"></span><span class="price">50k</span></div>
+                    <div class="item"><span class="item-name">Trà đào cam sả</span><span class="dots"></span><span
+                            class="price">50k</span></div>
+                </div>
+
+                <div class="category">
+                    <h2>Nước Ép</h2>
+                    <div class="item"><span class="item-name">Cam / Dưa hấu</span><span class="dots"></span><span
+                            class="price">40k</span></div>
+                    <div class="item"><span class="item-name">Chanh leo</span><span class="dots"></span><span
+                            class="price">40k</span></div>
+                </div>
+            </div>
+
+            <!-- CỘT 3: Trà sữa, Kem & Ngọt (Nhóm Béo ngậy) -->
+            <div class="col">
+                <div class="category">
+                    <h2>Trà Sữa</h2>
+                    <div class="item"><span class="item-name">Lài may</span><span class="dots"></span><span
+                            class="price">50k</span></div>
+                    <div class="item"><span class="item-name">Olong may</span><span class="dots"></span><span
+                            class="price">50k</span></div>
+                    <div class="item"><span class="item-name">Trà sữa khoai môn</span><span class="dots"></span><span
+                            class="price">50k</span></div>
+                </div>
+
+                <div class="category">
+                    <h2>Sữa Chua</h2>
+                    <div class="item"><span class="item-name">Lục trà tropical</span><span class="dots"></span><span
+                            class="price">40k</span></div>
+                    <div class="item"><span class="item-name">Sữa chua đánh đá</span><span class="dots"></span><span
+                            class="price">45k</span></div>
+                </div>
+
+                <div class="category">
+                    <h2>Ice Blended</h2>
+                    <div class="item"><span class="item-name">Chocolate kem muối</span><span class="dots"></span><span
+                            class="price">45k</span></div>
+                    <div class="item"><span class="item-name">Matcha latte</span><span class="dots"></span><span
+                            class="price">50k</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER: Topping trải ngang -->
+        <div class="footer-topping">
+            <h3>TOPPING (10k)</h3>
+            <div class="topping-list">
+                <span class="topping-item">Hạt nổ ngọc trai</span>
+                <span class="topping-item">Hạt nổ củ năng</span>
+                <span class="topping-item">Trân châu trắng</span>
+                <span class="topping-item">Thạch đào</span>
+                <span class="topping-item">Pudding trứng</span>
+                <span class="topping-item">Kem muối</span>
+                <span class="topping-item">Kem hạnh nhân</span>
+                <span class="topping-item">Kem trứng</span>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+
+</html>
